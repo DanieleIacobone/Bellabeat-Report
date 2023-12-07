@@ -1,0 +1,353 @@
+---
+title: "Bellabeat Analysis"
+author: "Daniele Iacobone"
+date: "2023-12-05"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Bellabeat Case Study
+
+# Scenario
+
+Report made for the Marketing Team at [Bellabeat](https://bellabeat.com/), a high-tech manufacturer of health-focused products for women. Bellabeat is a successful small company, but they have the potential to become a larger player in the global smart device market. Urška Sršen, cofounder and Chief Creative Officer of Bellabeat, believes that analyzing smart device fitness data could help unlock new growth opportunities for the company. I have been asked to focus on one of Bellabeat's products and analyze smart device data to gain insight into how consumers are using their smart devices. The insights you discover will then help guide marketing strategy for the company. I will present my analysis to the Bellabeat executive team along with high-level recommendations for Bellabeat's marketing strategy.
+
+# Ask
+
+The purpose is to analyze smart device usage data in order to gain insight into how consumers use non-Bellabeat smart devices. Then, select one Bellabeat product to apply these insights to in my presentation. 1. What are some trends in smart device usage? 2. How could these trends apply to Bellabeat customers? 3. How could these trends help influence Bellabeat marketing strategy?
+
+# Prepare
+
+I will use public data that explores smart device users' daily habits. [FitBit Fitness Tracker Data](https://www.kaggle.com/arashnic/fitbit) (CC0: Public Domain, dataset made available through Mobius): This Kaggle data set contains personal fitness tracker from thirty fitbit users. Thirty eligible Fitbit users consented to the submission of personal tracker data, including minute-level output for physical activity, heart rate, and sleep monitoring. It includes information about daily activity, steps, and heart rate that can be used to explore users' habits. The datasets are stored in CSV format, containing data about daily activity, daily calories, hearth rate and many other informations.
+
+# Analyze
+
+## Preliminary Analysis
+
+### Loading Libraries
+
+```{r}
+library(tidyverse)
+library(skimr)
+```
+
+### Loading CSV Files
+
+```{r}
+daily_activity <- read_csv("Fitbase_datasets/dailyActivity_merged.csv")
+sleep_day <- read_csv("Fitbase_datasets/sleepDay_merged.csv")
+```
+
+### Display Summary Statistics
+
+```{r}
+head(daily_activity, 5) # Top values
+tail(daily_activity, 5) # Bottom values
+daily_activity %>% 
+  select(TotalSteps,
+         TotalDistance,
+SedentaryMinutes) %>% 
+  summary()
+sum(is.na(daily_activity)) # There are not NA values
+n_distinct(daily_activity$Id) # Only 33 unique IDs
+```
+
+This dataset refers only to 33 unique IDs.
+
+```{r}
+head(sleep_day, 5) 
+tail(sleep_day, 5) 
+sleep_day %>% 
+  select(TotalSleepRecords, 
+                     TotalMinutesAsleep, 
+                     TotalTimeInBed) %>%
+  summary() 
+sum(is.na(sleep_day)) # There are no NAs
+n_distinct(sleep_day$Id)# Only 24 unique IDs
+```
+
+### Quick Visualisations
+
+What's the relationship between steps taken in a day and sedentary minutes?
+
+```{r}
+plot(daily_activity$TotalSteps, daily_activity$SedentaryMinutes,
+     xlab = "Total Steps", ylab= "Sedentary Minutes",
+     col = daily_activity$Id)
+```
+
+The relationship between steps taken in a day and sedentary minutes is often inversely proportional. In other words, as the number of steps taken increases, sedentary minutes (the time spent sitting or being inactive) generally decreases. If the target audience is already somewhat active, Bellabeat could market the product as a way to measure and optimize the steps they are already taking. Highlight advanced features such as detailed activity analysis, performance tracking, or integration with other fitness metrics.
+
+What's the relationship between minutes asleep and time in bed?
+
+```{r}
+plot(sleep_day$TotalMinutesAsleep, sleep_day$TotalTimeInBed,
+     xlab = "Total Minutes Asleep", ylab = "Total Time In Bed")
+```
+
+The relationship between minutes asleep and time in bed is typically referred to as sleep efficiency. As the graph illustrates, a clearly visible linear relationship exists between the total minutes asleep and the total time in bed.
+
+## In Detail Analysis
+
+### Join of the Dataframes
+
+Now, I am merging the two datasets using the variable 'Id' as the primary key, which is common to both datasets.
+
+```{r}
+full <- daily_activity %>%
+  merge(sleep_day, by = c("Id" = "Id"))
+n_distinct(full$Id)
+```
+
+The join has been completed, and 24 unique IDs have been identified.
+
+### Visualizations for the overall distribution of steps and total distance
+
+```{r}
+library(ggplot2)
+
+full %>%
+  ggplot(aes(x = TotalDistance)) +
+  geom_histogram(fill = "orange", color = "black", bins = 30) +
+  labs(title = "Distribution of Total Distance",
+       x = "Total Distance",
+       y = "Frequency") +
+  theme_minimal()
+
+full %>%
+  ggplot(aes(x = TotalSteps)) +
+  geom_histogram(fill = "skyblue", color = "black", bins = 30) +
+  labs(title = "Distribution of Total Steps",
+       x = "Total Steps",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+The bar chart for total distance reveals that the majority of measurements were recorded with distances ranging between 5 and 8 km, notably with over 1250 measurements at approximately 7 km. Although there are numerous readings for distances below 5 km, they do not exceed 1000 measurements. On the other hand, measurements beyond 10 km are relatively scarce.
+
+The chart for total steps indicates that the highest number of measurements, around 1200, corresponds to 10,000 steps. The readings show a generally increasing trend up to 10,000 steps, followed by a decreasing trend in measurements.
+
+The two charts are correlated, displaying similar characteristics overall.
+
+### Total Steps per Weekday
+
+```{r}
+library(lubridate)
+full <- full %>%
+  mutate(ActivityDate = as.Date(ActivityDate),
+         Weekday = weekdays(ActivityDate))
+
+full$Weekday <- factor(full$Weekday, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+full <- full[!is.na(full$Weekday), ]
+
+ggplot(full, aes(x = Weekday, y = TotalSteps, fill = "red" )) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Weekday", y = "Total Steps") +
+  ggtitle("Total Steps per Weekday") +
+  theme_minimal() +
+  theme(legend.position = "none", legend.key = element_blank())
+```
+
+As the bar chart depicts, the number of total steps relative to the day of the week does not follow a consistent trend. The day with the highest number of steps is Wednesday, with approximately 22,500 steps, and another peak is observed on Saturday with a similar figure. The remaining days of the week typically see an average of no fewer than 15,000 steps.
+
+## Analysis with other Datasets
+
+### Loading other datasets
+
+```{r}
+daily_calories <- read_csv("Fitbase_datasets/dailyCalories_merged.csv")
+daily_intensities <- read_csv("Fitbase_datasets/dailyIntensities_merged.csv")
+daily_steps <- read_csv("Fitbase_datasets/dailySteps_merged.csv")
+weightloginfo <- read_csv("Fitbase_datasets/weightLogInfo_merged.csv")
+```
+
+### Datasets Merging
+
+```{r}
+merge1 <- merge(daily_activity, daily_calories,
+                by = c("Id", "Calories"))
+merge2 <- merge(daily_intensities, daily_intensities,
+                by = c("Id", "ActivityDay",
+                       "SedentaryMinutes",
+                  "LightlyActiveMinutes",
+                  "FairlyActiveMinutes",
+                  "VeryActiveMinutes", 
+                  "SedentaryActiveDistance", 
+                  "LightActiveDistance", 
+                  "ModeratelyActiveDistance", 
+                  "VeryActiveDistance"))
+
+merge_daily <- merge(merge1, merge2, by = c("Id","ActivityDay","SedentaryMinutes", "LightlyActiveMinutes","FairlyActiveMinutes","VeryActiveMinutes", "SedentaryActiveDistance", "LightActiveDistance", "ModeratelyActiveDistance", "VeryActiveDistance")) %>%
+select(-ActivityDay) %>% rename(Date = ActivityDate)
+
+daily_data <- merge(merge_daily, sleep_day, by = "Id",all=TRUE) %>% drop_na() %>% select(-SleepDay, -TrackerDistance)
+
+daily_data <- merge(daily_data, weightloginfo, by = "Id")
+```
+
+### Statistic Analysis and NAs
+
+```{r}
+summary(daily_data)
+colSums(is.na(daily_data)) # No NAs
+```
+
+### Grouping
+
+In order to better visualize the data I will group the user into four groups for which of their activity types they have more minutes. This is useful to better visualise the patterns.
+
+```{r}
+data_by_usertype <- daily_data %>%
+reframe(user_type = factor(case_when(
+    SedentaryMinutes > mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Sedentary",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes > mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Lightly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes > mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Fairly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes > mean(VeryActiveMinutes) ~ "Very Active",
+),levels=c("Sedentary", "Lightly Active", "Fairly Active", "Very Active")), Calories, TotalSteps, TotalTimeInBed, TotalMinutesAsleep, BMI, WeightKg, Date.x, .group=Id) %>%
+  drop_na()
+```
+
+### User Type Distribuition
+
+```{r}
+data_by_usertype %>%
+group_by(user_type) %>%
+reframe(total = n()) %>%
+mutate(totals = sum(total)) %>%
+group_by(user_type) %>%
+reframe(total_percent = total / totals) %>%
+ggplot(aes(user_type,y=total_percent, fill=user_type)) +
+    geom_col() +
+  labs(title = "User type distribuition", x = "User Type", y = "Total Percent") +
+  theme(legend.position="none")
+```
+
+The bar chart reveals that approximately 65% of user types are classified as sedentary, around 25% as lightly active, and 10% as fairly active. The remaining category, very active, represents a relatively low percentage.
+
+### Calories burned by User Type
+
+```{r}
+ggplot(data_by_usertype, aes(user_type, Calories, fill=user_type)) +
+    geom_boxplot() +
+    theme(legend.position="none") +
+    labs(title = "Calories burned by User type", x = NULL) +
+    theme(legend.position="none")
+```
+
+As expected, the box plot illustrates that the 'very active' group is the one consuming the highest number of calories, with a range between 1750 and 2750 calories. However, further investigation is needed to understand why the box plot for the 'fairly active' group is not clearly visible, despite representing 10% of the dataset.
+
+### Total Steps by User Type
+
+```{r}
+ggplot(data_by_usertype, aes(user_type, TotalSteps, fill=user_type)) +
+    geom_boxplot() +
+    theme(legend.position="none") +
+    labs(title = "Total Steps by User type", x = NULL) +
+    theme(legend.position="none")
+```
+
+The box plot reveals that, as expected based on their categorization, sedentary individuals have a lower range of total steps, ranging from approximately 1500 to 5500. On the other hand, the 'very active' group covers a total steps range from around 5500 to approximately 10,000.
+
+### Sleep Efficiency by User Type
+
+```{r}
+ggplot(data_by_usertype, aes(x = TotalMinutesAsleep, 
+                             y = TotalTimeInBed,
+                             col = user_type)) +
+  geom_point() +
+  labs(title = "Sleep Efficiency by User Type",
+       x = "Total Minutes Asleep",
+       y = "Total Time in Bed") +
+  facet_wrap(~ user_type)
+```
+
+The chart indicates that the readings for the four groups display sleep efficiency values that are generally similar on average.
+
+### Division based on Physical Fitness
+
+```{r}
+user_fit <- data_by_usertype %>%
+  group_by(user_type, BMI) %>%
+  mutate(Forma = if_else(BMI < 18.5, "Underweight", if_else(BMI > 18.5 & BMI < 24.9, "Normal Weight", if_else(BMI > 24.9 & BMI < 29.9, "Overweight", "Obese")))) %>%
+  reframe(Forma, Calories, Date.x)
+```
+
+I have categorized based on Body Mass Index (BMI), an index used to assess the proportion of weight to height in a person. BMI is calculated by dividing weight in kilograms by the square of height in meters. The division you provided is as follows:
+
+Underweight: BMI less than 18.5 Normal weight: BMI between 18.5 and 24.9 Overweight: BMI between 25 and 29.9 Obese: BMI greater than 30
+
+```{r}
+unique(user_fit$Forma)
+sum(is.na(user_fit$Forma))
+```
+
+### Distribution of Physical Fitness by User Type
+
+```{r}
+user_fit %>%
+  group_by(user_type, Forma) %>%
+  summarise(Count = n()) %>%
+  drop_na() %>%
+  ggplot(aes(x = user_type, y = Count, fill = Forma)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "User Type", y = NULL , title = "Distribution of Physical Fitness by User Type")
+```
+
+The chart illustrates that the sedentary group is predominantly composed of normal-weight individuals, with fewer than 1/3 being obese and others being overweight. On the other hand, the very active group has some individuals with normal weight and some who are overweight.
+
+### Total Calories by Physical Fitness
+
+```{r}
+user_fit %>%
+  group_by(Forma) %>%
+  summarise(MaxCalories = max(Calories)) %>%
+  ggplot(aes(x = Forma, y = MaxCalories, fill = Forma)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Forma", y = NULL, title = "Max Calories by Physical Fitness")
+```
+
+Surprisingly, the chart reveals that overweight individuals are the ones consuming the most calories, exceeding 3500 calories. Additionally, obese individuals rank second in terms of calorie consumption, averaging around 2500 calories. Meanwhile, normal-weight individuals consume the least, slightly above 2200 calories.
+
+### 
+
+```{r}
+is.Date(user_fit$Date.x)
+user_fit$Date.x <- as.Date(user_fit$Date.x, format="%m/%d/%Y")
+is.Date(user_fit$Date.x)
+head(user_fit$Date.x)
+
+user_fit <- user_fit %>%
+  mutate("Weekday" = weekdays(Date.x))
+```
+
+### Max Calories by Weekday
+
+```{r}
+user_fit %>%
+  group_by(Forma) %>%
+  reframe(MaxCalories = max(Calories, na.rm = TRUE), Weekday) %>%
+  ggplot(aes(x = Weekday, y = MaxCalories, fill = Forma)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Weekday", y = NULL, title = "Max Calories by Weekday") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.text.y = element_text(angle = 90, hjust = 1)) 
+```
+
+The chart highlights that Sunday is the day when normal-weight individuals typically consume more calories. On the other hand, overweight and obese individuals have an average maximum calorie consumption throughout the week, with a slightly higher amount on Wednesday.
+
+# Share
+
+## General Comment
+
+Based on the recent analyses, it appears that there are interesting patterns in calorie consumption and physical fitness among different user types. Surprisingly, overweight individuals tend to have the highest maximum calorie consumption, while normal-weight individuals consume more on Sundays. Additionally, the sedentary group is mainly composed of normal-weight individuals, while the very active group shows variation with both normal-weight and overweight individuals. These insights provide valuable information for understanding the relationships between lifestyle factors, caloric intake, and physical fitness among the studied groups.
+
+## Reccomendations for the Marketing Team
+
+-   Utilize the ongoing pattern of sustained involvement to present tailored observations and suggestions. Bellabeat has the opportunity to position its products as supportive companions, delivering practical guidance derived from users' monitored data. This approach enhances the overall user experience, aiding individuals in improving their physical fitness and BMI.
+-   Enhanced Notification Strategy: Explore the optimization of notification tactics by discerning the peak usage periods of each user. Delivering timely and pertinent notifications aligned with users' peak activity times or when they are most likely to interact with their devices can significantly boost communication effectiveness. This encourages users to continually outperform their previous achievements.
+-   Community Engagement and Challenges: Encourage community engagement by incorporating features that allow users to share achievements or challenges with others. Creating a sense of community around Bellabeat products can foster a supportive environment and enhance the overall user experience.
+
+## Conclusion
+In conclusion, this case study has offered valuable insights into the usage of smart devices. The in-depth analysis and findings have illuminated user engagement, providing a comprehensive understanding of the challenges and opportunities within this context.
